@@ -2,8 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fcfcfb">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1a1a19">
   <title>dash</title>
+  <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16" rx="4" fill="%232a78d6"/><path d="M3 10.5l3-3.5 2.5 2L13 4.5" stroke="white" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>'>
   <link rel="stylesheet" href="/assets/uPlot.min.css">
   <style>
     :root {
@@ -16,6 +19,7 @@
       --series-6: #008300;
       --series-7: #4a3aa7;
       --series-8: #e34948;
+      --status-good: #0ca30c;
       --chart-surface: #fcfcfb;
       --page-background: #f9f9f7;
       --primary-text: #0b0b0b;
@@ -24,6 +28,10 @@
       --gridlines: #e1e0d9;
       --axis-stroke: #c3c2b7;
       --hairline: rgba(11,11,11,0.10);
+      --card-shadow: 0 1px 2px rgba(11,11,11,0.04), 0 4px 16px rgba(11,11,11,0.04);
+      --seg-shadow: inset 0 0 0 1px var(--hairline), 0 1px 2px rgba(11,11,11,0.07);
+      --scrim: rgba(11,11,11,0.35);
+      --topbar-h: calc(57px + env(safe-area-inset-top, 0px));
     }
 
     @media (prefers-color-scheme: dark) {
@@ -45,6 +53,9 @@
         --gridlines: #2c2c2a;
         --axis-stroke: #383835;
         --hairline: rgba(255,255,255,0.10);
+        --card-shadow: none;
+        --seg-shadow: inset 0 0 0 1px var(--hairline);
+        --scrim: rgba(0,0,0,0.55);
       }
     }
 
@@ -66,6 +77,9 @@
       --gridlines: #e1e0d9;
       --axis-stroke: #c3c2b7;
       --hairline: rgba(11,11,11,0.10);
+      --card-shadow: 0 1px 2px rgba(11,11,11,0.04), 0 4px 16px rgba(11,11,11,0.04);
+      --seg-shadow: inset 0 0 0 1px var(--hairline), 0 1px 2px rgba(11,11,11,0.07);
+      --scrim: rgba(11,11,11,0.35);
     }
 
     :root[data-theme="dark"] {
@@ -86,20 +100,25 @@
       --gridlines: #2c2c2a;
       --axis-stroke: #383835;
       --hairline: rgba(255,255,255,0.10);
+      --card-shadow: none;
+      --seg-shadow: inset 0 0 0 1px var(--hairline);
+      --scrim: rgba(0,0,0,0.55);
     }
 
     * { box-sizing: border-box; }
 
-    html, body {
-      height: 100%;
-      margin: 0;
-    }
+    html { height: 100%; }
 
     body, button, input {
       font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
     }
 
     body {
+      height: 100vh;
+      height: 100dvh;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
       background: var(--page-background);
       color: var(--primary-text);
       overflow: hidden;
@@ -107,69 +126,172 @@
 
     button {
       border: 1px solid var(--hairline);
-      border-radius: 5px;
+      border-radius: 8px;
       background: var(--chart-surface);
       color: var(--secondary-text);
       cursor: pointer;
       font-size: 13px;
       line-height: 1;
-      padding: 8px 10px;
+      padding: 8px 11px;
     }
 
-    button:hover, button.active {
-      color: var(--primary-text);
-      border-color: var(--axis-stroke);
-    }
+    button:hover { color: var(--primary-text); border-color: var(--axis-stroke); }
 
-    button.active { font-weight: 600; }
+    :focus-visible {
+      outline: 2px solid var(--series-1);
+      outline-offset: 2px;
+    }
 
     .topbar {
-      height: 52px;
+      flex: 0 0 auto;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
       border-bottom: 1px solid var(--hairline);
-      padding: 0 14px;
+      padding: env(safe-area-inset-top, 0px) 16px 0;
+      padding-left: calc(16px + env(safe-area-inset-left, 0px));
+      padding-right: calc(16px + env(safe-area-inset-right, 0px));
+      min-height: var(--topbar-h);
       background: var(--chart-surface);
     }
 
+    .icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+      width: 34px;
+      height: 34px;
+      padding: 0;
+    }
+
+    .icon-btn svg { display: block; }
+
+    #menu-toggle { display: none; position: relative; }
+
+    #menu-count {
+      position: absolute;
+      top: -5px;
+      right: -5px;
+      min-width: 15px;
+      height: 15px;
+      padding: 0 3px;
+      border-radius: 999px;
+      background: var(--series-1);
+      color: #ffffff;
+      font-size: 10px;
+      font-weight: 650;
+      line-height: 15px;
+      text-align: center;
+    }
+
+    #menu-count[hidden] { display: none; }
+
     .brand {
-      font-size: 19px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 17px;
       font-weight: 700;
       letter-spacing: -0.02em;
-      margin-right: 12px;
+      margin-right: 8px;
+    }
+
+    .brand-mark {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+      background: var(--series-1);
+    }
+
+    .seg {
+      display: inline-flex;
+      gap: 2px;
+      padding: 3px;
+      border: 1px solid var(--hairline);
+      border-radius: 9px;
+      background: var(--page-background);
+    }
+
+    .seg button {
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      padding: 6px 11px;
+      white-space: nowrap;
+    }
+
+    .seg button:hover { color: var(--primary-text); }
+
+    .seg button.active {
+      background: var(--chart-surface);
+      box-shadow: var(--seg-shadow);
+      color: var(--primary-text);
+      font-weight: 600;
     }
 
     .spacer { flex: 1; }
 
-    .toggle {
+    #live-toggle {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      color: var(--secondary-text);
-      font-size: 13px;
+      gap: 7px;
+      border-radius: 999px;
+      padding: 8px 13px;
       white-space: nowrap;
     }
 
-    .toggle input { accent-color: var(--series-1); }
+    .live-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--muted);
+      flex: 0 0 auto;
+    }
+
+    #live-toggle[aria-pressed="true"] { color: var(--primary-text); }
+    #live-toggle[aria-pressed="true"] .live-dot {
+      background: var(--status-good);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.35; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .live-dot { animation: none !important; }
+      aside, #scrim, .disclosure { transition: none !important; }
+    }
+
+    #theme-toggle .theme-icon-sun { display: none; }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) #theme-toggle .theme-icon-sun { display: block; }
+      :root:not([data-theme="light"]) #theme-toggle .theme-icon-moon { display: none; }
+    }
+    :root[data-theme="dark"] #theme-toggle .theme-icon-sun { display: block; }
+    :root[data-theme="dark"] #theme-toggle .theme-icon-moon { display: none; }
 
     .layout {
+      flex: 1;
+      min-height: 0;
       display: grid;
-      grid-template-columns: 220px minmax(0, 1fr);
-      height: calc(100% - 52px);
+      grid-template-columns: 240px minmax(0, 1fr);
     }
 
     aside {
       overflow-y: auto;
       border-right: 1px solid var(--hairline);
-      padding: 16px 12px;
+      padding: 16px 12px calc(16px + env(safe-area-inset-bottom, 0px));
+      padding-left: calc(12px + env(safe-area-inset-left, 0px));
     }
 
     .sidebar-title {
       color: var(--secondary-text);
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 650;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.06em;
       margin: 0 4px 10px;
       text-transform: uppercase;
     }
@@ -178,39 +300,56 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      margin: 0 4px 10px;
+      margin: 0 2px 10px;
     }
 
     #series-filter {
       min-width: 0;
       width: 100%;
       border: 1px solid var(--hairline);
-      border-radius: 5px;
+      border-radius: 8px;
       background: var(--chart-surface);
       color: var(--primary-text);
-      font-size: 12px;
-      padding: 6px 7px;
+      font-size: 13px;
+      padding: 8px 10px;
     }
 
     #series-filter::placeholder { color: var(--muted); }
     #selected-count { color: var(--muted); font-size: 11px; white-space: nowrap; }
-    #series-list { display: grid; gap: 2px; }
+    #series-list { display: grid; gap: 1px; }
 
     .tree-row {
       display: flex;
       align-items: center;
       gap: 8px;
-      border-radius: 4px;
+      min-height: 32px;
+      border-radius: 6px;
       color: var(--secondary-text);
       cursor: pointer;
       font-size: 13px;
       min-width: 0;
-      padding: 7px 4px;
+      padding: 4px 6px;
     }
 
     .tree-row:hover { background: var(--hairline); }
-    .leaf-row input { flex: 0 0 auto; margin: 0; }
+    .leaf-row.checked { color: var(--primary-text); }
+    .leaf-row.capped { cursor: not-allowed; opacity: 0.45; }
     .branch-row { color: var(--primary-text); user-select: none; }
+
+    .leaf-row input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: 0;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .leaf-row input:focus-visible ~ .slot-dot {
+      outline: 2px solid var(--series-1);
+      outline-offset: 2px;
+    }
+
     .disclosure {
       color: var(--muted);
       flex: 0 0 auto;
@@ -219,42 +358,54 @@
       width: 9px;
     }
     .disclosure.expanded { transform: rotate(90deg); }
-    .leaf-count { color: var(--muted); font-size: 11px; margin-left: auto; }
+    .leaf-count { color: var(--muted); font-size: 11px; margin-left: auto; padding-left: 6px; }
     .series-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
     .slot-dot {
+      border: 1.5px solid var(--axis-stroke);
       border-radius: 50%;
       flex: 0 0 auto;
-      height: 8px;
-      width: 8px;
+      height: 10px;
+      width: 10px;
+      background: transparent;
     }
 
     #series-hint {
       color: var(--muted);
       font-size: 12px;
-      margin: 10px 4px 0;
+      margin: 10px 6px 0;
       min-height: 18px;
     }
 
     main {
       min-width: 0;
       min-height: 0;
-      padding: 14px;
+      display: flex;
+      padding: 16px;
+      padding-right: calc(16px + env(safe-area-inset-right, 0px));
+      padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
     }
 
     #chart-shell {
       position: relative;
-      height: 100%;
-      width: 100%;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-width: 0;
+      max-width: 1760px;
+      margin: 0 auto;
       overflow: hidden;
       border: 1px solid var(--hairline);
-      border-radius: 6px;
+      border-radius: 12px;
       background: var(--chart-surface);
+      box-shadow: var(--card-shadow);
+      padding-top: 10px;
     }
 
     #chart {
-      height: 100%;
-      width: 100%;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
       font-variant-numeric: tabular-nums;
     }
 
@@ -263,55 +414,173 @@
       inset: 0;
       display: none;
       place-content: center;
+      justify-items: center;
       padding: 24px;
       text-align: center;
       color: var(--secondary-text);
+      background: var(--chart-surface);
     }
 
     #empty.visible { display: grid; }
-    #empty p { margin: 0 0 12px; }
+    #empty p { margin: 0 0 14px; max-width: 46ch; }
+
+    #empty svg {
+      display: block;
+      margin-bottom: 14px;
+      color: var(--axis-stroke);
+    }
 
     #empty code {
       max-width: 100%;
       overflow-wrap: anywhere;
       border: 1px solid var(--hairline);
-      border-radius: 5px;
+      border-radius: 8px;
       background: var(--page-background);
       color: var(--primary-text);
-      padding: 9px 11px;
+      font-size: 12px;
+      line-height: 1.5;
+      padding: 10px 12px;
       text-align: left;
     }
 
-    .uplot { background: var(--chart-surface); }
-    .u-legend { color: var(--primary-text); font-variant-numeric: tabular-nums; }
-    .u-legend .u-label, .u-legend .u-value { color: var(--primary-text) !important; }
+    .uplot { background: transparent; }
 
-    @media (max-width: 700px) {
-      .layout { grid-template-columns: 150px minmax(0, 1fr); }
-      .topbar { gap: 5px; padding: 0 8px; }
-      .brand { margin-right: 2px; }
-      button { padding: 7px; }
-      .toggle span { display: none; }
-      main { padding: 8px; }
+    #chart .u-legend {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 2px 16px;
+      width: 100%;
+      margin-top: 4px;
+      padding: 8px 14px;
+      border-top: 1px solid var(--hairline);
+      font: 12px system-ui, -apple-system, "Segoe UI", sans-serif;
+      color: var(--secondary-text);
+      text-align: left;
+    }
+
+    #chart .u-legend tbody { display: contents; }
+    #chart .u-legend tr { display: inline-flex; align-items: center; gap: 6px; }
+    #chart .u-legend th, #chart .u-legend td { padding: 0; font-weight: 400; }
+    #chart .u-legend th { display: inline-flex; align-items: center; gap: 6px; }
+    #chart .u-legend th::after { content: none; }
+    #chart .u-legend .u-label { color: var(--secondary-text); }
+    #chart .u-legend .u-value {
+      color: var(--primary-text);
+      font-variant-numeric: tabular-nums;
+      min-width: 5ch;
+    }
+    #chart .u-legend .u-marker {
+      width: 10px;
+      height: 10px;
+      border-width: 5px;
+      border-radius: 3px;
+    }
+    #chart .u-legend tr.u-off { opacity: 0.4; }
+
+    #scrim {
+      display: none;
+      position: fixed;
+      top: var(--topbar-h);
+      right: 0;
+      bottom: 0;
+      left: 0;
+      z-index: 20;
+      background: var(--scrim);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 180ms ease;
+    }
+
+    @media (max-width: 720px) {
+      .topbar {
+        gap: 8px;
+        padding-left: calc(10px + env(safe-area-inset-left, 0px));
+        padding-right: calc(10px + env(safe-area-inset-right, 0px));
+      }
+      .brand { margin-right: 0; }
+      .seg button { padding: 6px 9px; }
+      #live-toggle span:not(.live-dot) { display: none; }
+      #live-toggle { padding: 8px; width: 34px; height: 34px; justify-content: center; }
+      #menu-toggle { display: inline-flex; }
+      .layout { grid-template-columns: minmax(0, 1fr); }
+      #scrim { display: block; }
+      body.drawer-open #scrim { opacity: 1; pointer-events: auto; }
+      aside {
+        position: fixed;
+        top: var(--topbar-h);
+        bottom: 0;
+        left: 0;
+        z-index: 30;
+        width: min(320px, 86vw);
+        background: var(--chart-surface);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+        transform: translateX(-108%);
+        transition: transform 200ms ease;
+      }
+      body.drawer-open aside { transform: none; }
+      main { padding: 10px; padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
+      #chart-shell { border-radius: 10px; }
+      #chart .u-legend { gap: 2px 12px; padding: 7px 10px; }
+    }
+
+    @media (max-width: 420px) {
+      .topbar { gap: 6px; }
+    }
+
+    @media (max-width: 359px) {
+      .brand-text { display: none; }
+    }
+
+    @media (min-width: 1440px) {
+      .layout { grid-template-columns: 280px minmax(0, 1fr); }
+      main { padding: 20px 24px; padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px)); }
+    }
+
+    @media (pointer: coarse) {
+      .tree-row { min-height: 44px; }
+      button { min-height: 40px; }
+      .icon-btn, #live-toggle { min-height: 40px; }
+      .icon-btn { width: 40px; height: 40px; }
+      .seg button { min-height: 32px; }
+      #series-filter { padding: 10px; }
     }
   </style>
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">dash</div>
-    <button class="range" data-minutes="5">5m</button>
-    <button class="range active" data-minutes="15">15m</button>
-    <button class="range" data-minutes="60">1h</button>
-    <button class="range" data-minutes="180">3h</button>
+    <button id="menu-toggle" class="icon-btn" type="button" aria-label="Toggle series panel" aria-expanded="false">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+        <path d="M2 4h12M2 8h12M2 12h12"/>
+      </svg>
+      <span id="menu-count" hidden></span>
+    </button>
+    <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span class="brand-text">dash</span></div>
+    <div class="seg" role="group" aria-label="Time range">
+      <button class="range" data-minutes="5">5m</button>
+      <button class="range active" data-minutes="15">15m</button>
+      <button class="range" data-minutes="60">1h</button>
+      <button class="range" data-minutes="180">3h</button>
+    </div>
     <div class="spacer"></div>
-    <label class="toggle"><input id="auto-refresh" type="checkbox" checked><span>auto-refresh</span></label>
-    <button id="theme-toggle" type="button" aria-label="Toggle light and dark theme">theme</button>
+    <button id="live-toggle" type="button" aria-pressed="true" aria-label="Toggle auto-refresh">
+      <span class="live-dot" aria-hidden="true"></span><span>live</span>
+    </button>
+    <button id="theme-toggle" class="icon-btn" type="button" aria-label="Toggle light and dark theme">
+      <svg class="theme-icon-moon" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M13.5 9.5a5.5 5.5 0 0 1-7-7 5.5 5.5 0 1 0 7 7Z"/>
+      </svg>
+      <svg class="theme-icon-sun" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true">
+        <circle cx="8" cy="8" r="3.2"/>
+        <path d="M8 1.2v1.6M8 13.2v1.6M1.2 8h1.6M13.2 8h1.6M3.2 3.2l1.1 1.1M11.7 11.7l1.1 1.1M12.8 3.2l-1.1 1.1M4.3 11.7l-1.1 1.1"/>
+      </svg>
+    </button>
   </header>
   <div class="layout">
-    <aside>
+    <aside id="sidebar">
       <h2 class="sidebar-title">Series</h2>
       <div class="sidebar-tools">
-        <input id="series-filter" type="search" placeholder="filter…" aria-label="Filter series">
+        <input id="series-filter" type="search" placeholder="Filter…" aria-label="Filter series">
         <span id="selected-count">0 selected</span>
       </div>
       <div id="series-list"></div>
@@ -324,6 +593,7 @@
       </div>
     </main>
   </div>
+  <div id="scrim"></div>
   <script src="/assets/uPlot.iife.min.js"></script>
   <script>
     const state = {
@@ -338,16 +608,20 @@
       tree: null,
       expanded: new Set(),
       filter: "",
+      legendExtra: null,
     };
 
     const listEl = document.querySelector("#series-list");
     const hintEl = document.querySelector("#series-hint");
     const filterEl = document.querySelector("#series-filter");
     const selectedCountEl = document.querySelector("#selected-count");
+    const menuCountEl = document.querySelector("#menu-count");
+    const menuBtn = document.querySelector("#menu-toggle");
+    const scrimEl = document.querySelector("#scrim");
     const chartEl = document.querySelector("#chart");
     const shellEl = document.querySelector("#chart-shell");
     const emptyEl = document.querySelector("#empty");
-    const autoEl = document.querySelector("#auto-refresh");
+    const liveBtn = document.querySelector("#live-toggle");
     const root = document.documentElement;
 
     function color(slot) {
@@ -409,9 +683,9 @@
     function renderLeaf(node, depth, capped) {
       const checked = state.selected.has(node.path);
       const label = document.createElement("label");
-      label.className = "tree-row leaf-row";
+      label.className = `tree-row leaf-row${checked ? " checked" : ""}${!checked && capped ? " capped" : ""}`;
       label.title = node.path;
-      label.style.paddingLeft = `${depth * 14 + 4}px`;
+      label.style.paddingLeft = `${depth * 14 + 6}px`;
 
       const input = document.createElement("input");
       input.type = "checkbox";
@@ -434,7 +708,11 @@
 
       const dot = document.createElement("span");
       dot.className = "slot-dot";
-      dot.style.background = checked ? color(state.selected.get(node.path)) : "var(--axis-stroke)";
+      if (checked) {
+        const slotColor = color(state.selected.get(node.path));
+        dot.style.background = slotColor;
+        dot.style.borderColor = slotColor;
+      }
 
       const text = document.createElement("span");
       text.className = "series-name";
@@ -453,7 +731,7 @@
       const expanded = Boolean(state.filter) || state.expanded.has(node.path);
       const row = document.createElement("div");
       row.className = "tree-row branch-row";
-      row.style.paddingLeft = `${depth * 14 + 4}px`;
+      row.style.paddingLeft = `${depth * 14 + 6}px`;
       row.title = node.path;
       row.tabIndex = 0;
       row.setAttribute("role", "button");
@@ -496,6 +774,8 @@
       listEl.replaceChildren();
       const capped = state.selected.size >= 8;
       selectedCountEl.textContent = `${state.selected.size} selected`;
+      menuCountEl.textContent = String(state.selected.size);
+      menuCountEl.hidden = state.selected.size === 0;
       if (state.tree) {
         const roots = [...state.tree.children.values()]
           .sort((left, right) => left.segment.localeCompare(right.segment));
@@ -552,15 +832,44 @@
       }
       chartEl.replaceChildren();
       emptyEl.replaceChildren();
+      const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      icon.setAttribute("width", "44");
+      icon.setAttribute("height", "24");
+      icon.setAttribute("viewBox", "0 0 44 24");
+      icon.setAttribute("fill", "none");
+      icon.setAttribute("aria-hidden", "true");
+      icon.innerHTML = '<path d="M2 18 L10 12 L17 15 L26 5 L33 9 L42 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
       const text = document.createElement("p");
       text.textContent = message;
-      emptyEl.append(text);
+      emptyEl.append(icon, text);
       if (curl) {
         const command = document.createElement("code");
         command.textContent = `curl -s localhost:9090/ingest -d '{"m":"test","v":42}' -H 'content-type: application/json'`;
         emptyEl.append(command);
       }
       emptyEl.classList.add("visible");
+    }
+
+    function yAxisSize(self, values, axisIdx) {
+      if (!values) return 44;
+      const axis = self.axes[axisIdx];
+      self.ctx.save();
+      self.ctx.font = axis.font[0];
+      const widest = Math.max(...values.map(value => self.ctx.measureText(value).width));
+      self.ctx.restore();
+      return Math.ceil(widest / devicePixelRatio) + 16;
+    }
+
+    function fitChart() {
+      if (!state.chart) return;
+      const rect = chartEl.getBoundingClientRect();
+      const legend = chartEl.querySelector(".u-legend");
+      // +4 for the legend's margin-top
+      if (legend) state.legendExtra = legend.offsetHeight + 4;
+      state.chart.setSize({
+        width: Math.max(280, Math.floor(rect.width)),
+        height: Math.max(180, Math.floor(rect.height) - (state.legendExtra ?? 0)),
+      });
     }
 
     function buildChart(series, data) {
@@ -571,19 +880,19 @@
       const axis = style.getPropertyValue("--axis-stroke").trim();
       const grid = style.getPropertyValue("--gridlines").trim();
       const muted = style.getPropertyValue("--muted").trim();
-      const rect = shellEl.getBoundingClientRect();
-      const width = Math.max(300, Math.floor(rect.width));
-      const height = Math.max(240, Math.floor(rect.height));
+      const rect = chartEl.getBoundingClientRect();
+      const width = Math.max(280, Math.floor(rect.width));
+      const height = Math.max(180, Math.floor(rect.height) - (state.legendExtra ?? 35));
 
       state.chart = new uPlot({
         width,
         height,
         cursor: { show: true },
-        legend: { show: true, live: true },
+        legend: { show: true, live: true, markers: { width: 5 } },
         scales: { x: { time: true }, y: { auto: true } },
         axes: [
-          { stroke: muted, grid: { show: true, stroke: grid, width: 1 }, ticks: { show: true, stroke: axis, width: 1 }, font: '12px system-ui, -apple-system, "Segoe UI", sans-serif' },
-          { stroke: muted, grid: { show: true, stroke: grid, width: 1 }, ticks: { show: true, stroke: axis, width: 1 }, font: '12px system-ui, -apple-system, "Segoe UI", sans-serif' },
+          { stroke: muted, space: 80, grid: { show: true, stroke: grid, width: 1 }, ticks: { show: true, stroke: axis, width: 1 }, font: '12px system-ui, -apple-system, "Segoe UI", sans-serif' },
+          { stroke: muted, space: 40, grid: { show: true, stroke: grid, width: 1 }, ticks: { show: true, stroke: axis, width: 1 }, font: '12px system-ui, -apple-system, "Segoe UI", sans-serif', size: yAxisSize },
         ],
         series: [
           {},
@@ -598,6 +907,9 @@
           })),
         ],
       }, data, chartEl);
+      // uPlot applies sizes and legend layout on the next animation frame;
+      // measuring the legend before that reads a pre-layout height.
+      requestAnimationFrame(() => requestAnimationFrame(fitChart));
     }
 
     async function refreshChart() {
@@ -667,19 +979,34 @@
       }
     });
 
+    function setDrawer(open) {
+      document.body.classList.toggle("drawer-open", open);
+      menuBtn.setAttribute("aria-expanded", String(open));
+    }
+
+    menuBtn.addEventListener("click", () => {
+      setDrawer(!document.body.classList.contains("drawer-open"));
+    });
+    scrimEl.addEventListener("click", () => setDrawer(false));
+    addEventListener("keydown", event => {
+      if (event.key === "Escape") setDrawer(false);
+    });
+
+    liveBtn.addEventListener("click", () => {
+      const on = liveBtn.getAttribute("aria-pressed") !== "true";
+      liveBtn.setAttribute("aria-pressed", String(on));
+      if (on) refreshChart();
+    });
+
     filterEl.addEventListener("input", () => {
       state.filter = filterEl.value.trim().toLowerCase();
       renderTree();
     });
 
-    new ResizeObserver(() => {
-      if (!state.chart) return;
-      const rect = shellEl.getBoundingClientRect();
-      state.chart.setSize({ width: Math.max(300, Math.floor(rect.width)), height: Math.max(240, Math.floor(rect.height)) });
-    }).observe(shellEl);
+    new ResizeObserver(fitChart).observe(shellEl);
 
     setInterval(() => {
-      if (autoEl.checked) refreshChart();
+      if (liveBtn.getAttribute("aria-pressed") === "true") refreshChart();
     }, 5000);
     setInterval(refreshSeries, 10000);
     refreshSeries();
