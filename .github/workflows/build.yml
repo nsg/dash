@@ -1,0 +1,70 @@
+name: Build and publish
+
+on:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Update stable Rust toolchain
+        run: |
+          rustup update stable
+          rustup default stable
+
+      - name: Check Rust formatting
+        run: cargo fmt --check
+
+      - name: Run Rust tests
+        run: cargo test
+
+      - name: Run Clippy
+        run: cargo clippy -- -D warnings
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish container image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/nsg/dash:latest
+            ghcr.io/nsg/dash:sha-${{ github.sha }}
+
+  reconcile:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: none
+      id-token: write
+    steps:
+      - name: Request Kubernetes reconciliation
+        env:
+          AUDIENCE: https://reconcile.k8s.junkpile.se
+          ENDPOINT: https://reconcile.k8s.junkpile.se/v1/reconcile/dash
+        run: |
+          encoded_audience="$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["AUDIENCE"], safe=""))')"
+          token="$(curl --fail --silent --show-error \
+            --header "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${encoded_audience}" \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
+          curl --fail --silent --show-error \
+            --request POST \
+            --header "Authorization: Bearer ${token}" \
+            --data '' \
+            "${ENDPOINT}"
