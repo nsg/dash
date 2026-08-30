@@ -1,0 +1,688 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>dash</title>
+  <link rel="stylesheet" href="/assets/uPlot.min.css">
+  <style>
+    :root {
+      color-scheme: light;
+      --series-1: #2a78d6;
+      --series-2: #eb6834;
+      --series-3: #1baf7a;
+      --series-4: #eda100;
+      --series-5: #e87ba4;
+      --series-6: #008300;
+      --series-7: #4a3aa7;
+      --series-8: #e34948;
+      --chart-surface: #fcfcfb;
+      --page-background: #f9f9f7;
+      --primary-text: #0b0b0b;
+      --secondary-text: #52514e;
+      --muted: #898781;
+      --gridlines: #e1e0d9;
+      --axis-stroke: #c3c2b7;
+      --hairline: rgba(11,11,11,0.10);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        color-scheme: dark;
+        --series-1: #3987e5;
+        --series-2: #d95926;
+        --series-3: #199e70;
+        --series-4: #c98500;
+        --series-5: #d55181;
+        --series-6: #008300;
+        --series-7: #9085e9;
+        --series-8: #e66767;
+        --chart-surface: #1a1a19;
+        --page-background: #0d0d0d;
+        --primary-text: #ffffff;
+        --secondary-text: #c3c2b7;
+        --muted: #898781;
+        --gridlines: #2c2c2a;
+        --axis-stroke: #383835;
+        --hairline: rgba(255,255,255,0.10);
+      }
+    }
+
+    :root[data-theme="light"] {
+      color-scheme: light;
+      --series-1: #2a78d6;
+      --series-2: #eb6834;
+      --series-3: #1baf7a;
+      --series-4: #eda100;
+      --series-5: #e87ba4;
+      --series-6: #008300;
+      --series-7: #4a3aa7;
+      --series-8: #e34948;
+      --chart-surface: #fcfcfb;
+      --page-background: #f9f9f7;
+      --primary-text: #0b0b0b;
+      --secondary-text: #52514e;
+      --muted: #898781;
+      --gridlines: #e1e0d9;
+      --axis-stroke: #c3c2b7;
+      --hairline: rgba(11,11,11,0.10);
+    }
+
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --series-3: #199e70;
+      --series-4: #c98500;
+      --series-5: #d55181;
+      --series-6: #008300;
+      --series-7: #9085e9;
+      --series-8: #e66767;
+      --chart-surface: #1a1a19;
+      --page-background: #0d0d0d;
+      --primary-text: #ffffff;
+      --secondary-text: #c3c2b7;
+      --muted: #898781;
+      --gridlines: #2c2c2a;
+      --axis-stroke: #383835;
+      --hairline: rgba(255,255,255,0.10);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      height: 100%;
+      margin: 0;
+    }
+
+    body, button, input {
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+
+    body {
+      background: var(--page-background);
+      color: var(--primary-text);
+      overflow: hidden;
+    }
+
+    button {
+      border: 1px solid var(--hairline);
+      border-radius: 5px;
+      background: var(--chart-surface);
+      color: var(--secondary-text);
+      cursor: pointer;
+      font-size: 13px;
+      line-height: 1;
+      padding: 8px 10px;
+    }
+
+    button:hover, button.active {
+      color: var(--primary-text);
+      border-color: var(--axis-stroke);
+    }
+
+    button.active { font-weight: 600; }
+
+    .topbar {
+      height: 52px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid var(--hairline);
+      padding: 0 14px;
+      background: var(--chart-surface);
+    }
+
+    .brand {
+      font-size: 19px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-right: 12px;
+    }
+
+    .spacer { flex: 1; }
+
+    .toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--secondary-text);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .toggle input { accent-color: var(--series-1); }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 220px minmax(0, 1fr);
+      height: calc(100% - 52px);
+    }
+
+    aside {
+      overflow-y: auto;
+      border-right: 1px solid var(--hairline);
+      padding: 16px 12px;
+    }
+
+    .sidebar-title {
+      color: var(--secondary-text);
+      font-size: 12px;
+      font-weight: 650;
+      letter-spacing: 0.05em;
+      margin: 0 4px 10px;
+      text-transform: uppercase;
+    }
+
+    .sidebar-tools {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 4px 10px;
+    }
+
+    #series-filter {
+      min-width: 0;
+      width: 100%;
+      border: 1px solid var(--hairline);
+      border-radius: 5px;
+      background: var(--chart-surface);
+      color: var(--primary-text);
+      font-size: 12px;
+      padding: 6px 7px;
+    }
+
+    #series-filter::placeholder { color: var(--muted); }
+    #selected-count { color: var(--muted); font-size: 11px; white-space: nowrap; }
+    #series-list { display: grid; gap: 2px; }
+
+    .tree-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 4px;
+      color: var(--secondary-text);
+      cursor: pointer;
+      font-size: 13px;
+      min-width: 0;
+      padding: 7px 4px;
+    }
+
+    .tree-row:hover { background: var(--hairline); }
+    .leaf-row input { flex: 0 0 auto; margin: 0; }
+    .branch-row { color: var(--primary-text); user-select: none; }
+    .disclosure {
+      color: var(--muted);
+      flex: 0 0 auto;
+      font-size: 10px;
+      transition: transform 120ms ease;
+      width: 9px;
+    }
+    .disclosure.expanded { transform: rotate(90deg); }
+    .leaf-count { color: var(--muted); font-size: 11px; margin-left: auto; }
+    .series-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .slot-dot {
+      border-radius: 50%;
+      flex: 0 0 auto;
+      height: 8px;
+      width: 8px;
+    }
+
+    #series-hint {
+      color: var(--muted);
+      font-size: 12px;
+      margin: 10px 4px 0;
+      min-height: 18px;
+    }
+
+    main {
+      min-width: 0;
+      min-height: 0;
+      padding: 14px;
+    }
+
+    #chart-shell {
+      position: relative;
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      border: 1px solid var(--hairline);
+      border-radius: 6px;
+      background: var(--chart-surface);
+    }
+
+    #chart {
+      height: 100%;
+      width: 100%;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #empty {
+      position: absolute;
+      inset: 0;
+      display: none;
+      place-content: center;
+      padding: 24px;
+      text-align: center;
+      color: var(--secondary-text);
+    }
+
+    #empty.visible { display: grid; }
+    #empty p { margin: 0 0 12px; }
+
+    #empty code {
+      max-width: 100%;
+      overflow-wrap: anywhere;
+      border: 1px solid var(--hairline);
+      border-radius: 5px;
+      background: var(--page-background);
+      color: var(--primary-text);
+      padding: 9px 11px;
+      text-align: left;
+    }
+
+    .uplot { background: var(--chart-surface); }
+    .u-legend { color: var(--primary-text); font-variant-numeric: tabular-nums; }
+    .u-legend .u-label, .u-legend .u-value { color: var(--primary-text) !important; }
+
+    @media (max-width: 700px) {
+      .layout { grid-template-columns: 150px minmax(0, 1fr); }
+      .topbar { gap: 5px; padding: 0 8px; }
+      .brand { margin-right: 2px; }
+      button { padding: 7px; }
+      .toggle span { display: none; }
+      main { padding: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">dash</div>
+    <button class="range" data-minutes="5">5m</button>
+    <button class="range active" data-minutes="15">15m</button>
+    <button class="range" data-minutes="60">1h</button>
+    <button class="range" data-minutes="180">3h</button>
+    <div class="spacer"></div>
+    <label class="toggle"><input id="auto-refresh" type="checkbox" checked><span>auto-refresh</span></label>
+    <button id="theme-toggle" type="button" aria-label="Toggle light and dark theme">theme</button>
+  </header>
+  <div class="layout">
+    <aside>
+      <h2 class="sidebar-title">Series</h2>
+      <div class="sidebar-tools">
+        <input id="series-filter" type="search" placeholder="filter…" aria-label="Filter series">
+        <span id="selected-count">0 selected</span>
+      </div>
+      <div id="series-list"></div>
+      <div id="series-hint"></div>
+    </aside>
+    <main>
+      <div id="chart-shell">
+        <div id="chart"></div>
+        <div id="empty"></div>
+      </div>
+    </main>
+  </div>
+  <script src="/assets/uPlot.iife.min.js"></script>
+  <script>
+    const state = {
+      names: [],
+      selected: new Map(),
+      rangeMinutes: 15,
+      chart: null,
+      requestGeneration: 0,
+      didAutoSelect: false,
+      seriesLoaded: false,
+      expansionInitialized: false,
+      tree: null,
+      expanded: new Set(),
+      filter: "",
+    };
+
+    const listEl = document.querySelector("#series-list");
+    const hintEl = document.querySelector("#series-hint");
+    const filterEl = document.querySelector("#series-filter");
+    const selectedCountEl = document.querySelector("#selected-count");
+    const chartEl = document.querySelector("#chart");
+    const shellEl = document.querySelector("#chart-shell");
+    const emptyEl = document.querySelector("#empty");
+    const autoEl = document.querySelector("#auto-refresh");
+    const root = document.documentElement;
+
+    function color(slot) {
+      return getComputedStyle(root).getPropertyValue(`--series-${slot}`).trim();
+    }
+
+    function firstFreeSlot() {
+      const used = new Set(state.selected.values());
+      for (let slot = 1; slot <= 8; slot += 1) {
+        if (!used.has(slot)) return slot;
+      }
+      return null;
+    }
+
+    function buildTree(names) {
+      const tree = { children: new Map(), leaves: 0 };
+      for (const fullName of names) {
+        let node = tree;
+        const parts = fullName.split(".");
+        node.leaves += 1;
+        for (let index = 0; index < parts.length; index += 1) {
+          const segment = parts[index];
+          const path = parts.slice(0, index + 1).join(".");
+          if (!node.children.has(segment)) {
+            node.children.set(segment, {
+              segment,
+              path,
+              children: new Map(),
+              leaves: 0,
+              isLeaf: false,
+            });
+          }
+          node = node.children.get(segment);
+          node.leaves += 1;
+          if (index === parts.length - 1) node.isLeaf = true;
+        }
+      }
+      return tree;
+    }
+
+    function branchPaths(tree) {
+      const paths = new Set();
+      function visit(node) {
+        for (const child of node.children.values()) {
+          if (child.children.size > 0) paths.add(child.path);
+          visit(child);
+        }
+      }
+      visit(tree);
+      return paths;
+    }
+
+    function matchesFilter(node) {
+      if (!state.filter) return true;
+      if (node.isLeaf && node.path.toLowerCase().includes(state.filter)) return true;
+      return [...node.children.values()].some(matchesFilter);
+    }
+
+    function renderLeaf(node, depth, capped) {
+      const checked = state.selected.has(node.path);
+      const label = document.createElement("label");
+      label.className = "tree-row leaf-row";
+      label.title = node.path;
+      label.style.paddingLeft = `${depth * 14 + 4}px`;
+
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.checked = checked;
+      input.disabled = !checked && capped;
+      input.addEventListener("change", () => {
+        if (input.checked) {
+          const slot = firstFreeSlot();
+          if (slot === null) {
+            input.checked = false;
+            return;
+          }
+          state.selected.set(node.path, slot);
+        } else {
+          state.selected.delete(node.path);
+        }
+        renderTree();
+        refreshChart();
+      });
+
+      const dot = document.createElement("span");
+      dot.className = "slot-dot";
+      dot.style.background = checked ? color(state.selected.get(node.path)) : "var(--axis-stroke)";
+
+      const text = document.createElement("span");
+      text.className = "series-name";
+      text.textContent = node.segment;
+      label.append(input, dot, text);
+      listEl.append(label);
+    }
+
+    function renderNode(node, depth, capped) {
+      if (!matchesFilter(node)) return;
+      if (node.children.size === 0) {
+        renderLeaf(node, depth, capped);
+        return;
+      }
+
+      const expanded = Boolean(state.filter) || state.expanded.has(node.path);
+      const row = document.createElement("div");
+      row.className = "tree-row branch-row";
+      row.style.paddingLeft = `${depth * 14 + 4}px`;
+      row.title = node.path;
+      row.tabIndex = 0;
+      row.setAttribute("role", "button");
+      row.setAttribute("aria-expanded", String(expanded));
+
+      const disclosure = document.createElement("span");
+      disclosure.className = `disclosure${expanded ? " expanded" : ""}`;
+      disclosure.textContent = "▸";
+      const text = document.createElement("span");
+      text.className = "series-name";
+      text.textContent = node.segment;
+      const count = document.createElement("span");
+      count.className = "leaf-count";
+      count.textContent = String(node.leaves);
+      row.append(disclosure, text, count);
+
+      const toggle = () => {
+        if (state.filter) return;
+        if (expanded) state.expanded.delete(node.path);
+        else state.expanded.add(node.path);
+        renderTree();
+      };
+      row.addEventListener("click", toggle);
+      row.addEventListener("keydown", event => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          toggle();
+        }
+      });
+      listEl.append(row);
+
+      if (!expanded) return;
+      if (node.isLeaf) renderLeaf(node, depth + 1, capped);
+      const children = [...node.children.values()]
+        .sort((left, right) => left.segment.localeCompare(right.segment));
+      for (const child of children) renderNode(child, depth + 1, capped);
+    }
+
+    function renderTree() {
+      listEl.replaceChildren();
+      const capped = state.selected.size >= 8;
+      selectedCountEl.textContent = `${state.selected.size} selected`;
+      if (state.tree) {
+        const roots = [...state.tree.children.values()]
+          .sort((left, right) => left.segment.localeCompare(right.segment));
+        for (const node of roots) renderNode(node, 0, capped);
+      }
+      hintEl.textContent = capped && state.names.length > state.selected.size ? "max 8 series" : "";
+    }
+
+    async function refreshSeries() {
+      try {
+        const response = await fetch("/series", { cache: "no-store" });
+        if (!response.ok) throw new Error("series request failed");
+        const names = await response.json();
+        const firstLoad = !state.seriesLoaded;
+        state.seriesLoaded = true;
+        state.names = [...names].sort((a, b) => a.localeCompare(b));
+        state.tree = buildTree(state.names);
+
+        const currentBranches = branchPaths(state.tree);
+        state.expanded = new Set([...state.expanded].filter(path => currentBranches.has(path)));
+        if (!state.expansionInitialized && state.names.length > 0) {
+          state.expansionInitialized = true;
+          if (state.names.length <= 12) {
+            for (const node of state.tree.children.values()) {
+              if (node.children.size > 0) state.expanded.add(node.path);
+            }
+          }
+        }
+
+        let selectionChanged = false;
+        for (const name of [...state.selected.keys()]) {
+          if (!state.names.includes(name)) {
+            state.selected.delete(name);
+            selectionChanged = true;
+          }
+        }
+        if (!state.didAutoSelect && state.names.length > 0) {
+          state.selected.set(state.names[0], 1);
+          state.didAutoSelect = true;
+          selectionChanged = true;
+        }
+
+        renderTree();
+        if (firstLoad || selectionChanged) refreshChart();
+      } catch (error) {
+        showMessage("Unable to load series.");
+      }
+    }
+
+    function showMessage(message, curl = false) {
+      if (state.chart) {
+        state.chart.destroy();
+        state.chart = null;
+      }
+      chartEl.replaceChildren();
+      emptyEl.replaceChildren();
+      const text = document.createElement("p");
+      text.textContent = message;
+      emptyEl.append(text);
+      if (curl) {
+        const command = document.createElement("code");
+        command.textContent = `curl -s localhost:9090/ingest -d '{"m":"test","v":42}' -H 'content-type: application/json'`;
+        emptyEl.append(command);
+      }
+      emptyEl.classList.add("visible");
+    }
+
+    function buildChart(series, data) {
+      if (state.chart) state.chart.destroy();
+      chartEl.replaceChildren();
+      emptyEl.classList.remove("visible");
+      const style = getComputedStyle(root);
+      const axis = style.getPropertyValue("--axis-stroke").trim();
+      const grid = style.getPropertyValue("--gridlines").trim();
+      const muted = style.getPropertyValue("--muted").trim();
+      const rect = shellEl.getBoundingClientRect();
+      const width = Math.max(300, Math.floor(rect.width));
+      const height = Math.max(240, Math.floor(rect.height));
+
+      state.chart = new uPlot({
+        width,
+        height,
+        cursor: { show: true },
+        legend: { show: true, live: true },
+        scales: { x: { time: true }, y: { auto: true } },
+        axes: [
+          { stroke: muted, grid: { show: true, stroke: grid, width: 1 }, ticks: { show: true, stroke: axis, width: 1 }, font: '12px system-ui, -apple-system, "Segoe UI", sans-serif' },
+          { stroke: muted, grid: { show: true, stroke: grid, width: 1 }, ticks: { show: true, stroke: axis, width: 1 }, font: '12px system-ui, -apple-system, "Segoe UI", sans-serif' },
+        ],
+        series: [
+          {},
+          ...series.map(({ name, slot }) => ({
+            label: name,
+            scale: "y",
+            stroke: color(slot),
+            width: 2,
+            points: { show: false },
+            fill: null,
+            spanGaps: false,
+          })),
+        ],
+      }, data, chartEl);
+    }
+
+    async function refreshChart() {
+      const generation = ++state.requestGeneration;
+      if (state.names.length === 0) {
+        showMessage("No series yet. Push a metric to get started:", true);
+        return;
+      }
+
+      const series = state.names
+        .filter(name => state.selected.has(name))
+        .map(name => ({ name, slot: state.selected.get(name) }));
+      if (series.length === 0) {
+        showMessage("Select a series to graph.");
+        return;
+      }
+
+      const to = Date.now();
+      const from = to - state.rangeMinutes * 60_000;
+      const step = Math.max(1000, Math.floor((to - from) / 300));
+      try {
+        const query = new URLSearchParams({ from: String(from), to: String(to), step: String(step) });
+        for (const { name } of series) query.append("m", name);
+        const response = await fetch(`/query?${query}`, { cache: "no-store" });
+        if (!response.ok) throw new Error("query request failed");
+        const result = await response.json();
+        if (generation !== state.requestGeneration) return;
+
+        const pointsByName = new Map(result.series.map(item => [item.m, item.points]));
+        const chartSeries = series.filter(({ name }) => pointsByName.has(name));
+        if (chartSeries.length === 0) {
+          showMessage("No matching series.");
+          return;
+        }
+        const orderedPoints = pointsByName.get(chartSeries[0].name);
+        const data = [
+          orderedPoints.map(([timestamp]) => timestamp / 1000),
+          ...chartSeries.map(({ name }) => pointsByName.get(name).map(([, value]) => value)),
+        ];
+        buildChart(chartSeries, data);
+      } catch (error) {
+        if (generation === state.requestGeneration) showMessage("Unable to load chart data.");
+      }
+    }
+
+    document.querySelectorAll(".range").forEach(button => {
+      button.addEventListener("click", () => {
+        state.rangeMinutes = Number(button.dataset.minutes);
+        document.querySelectorAll(".range").forEach(item => item.classList.toggle("active", item === button));
+        refreshChart();
+      });
+    });
+
+    document.querySelector("#theme-toggle").addEventListener("click", () => {
+      const isDark = root.dataset.theme
+        ? root.dataset.theme === "dark"
+        : matchMedia("(prefers-color-scheme: dark)").matches;
+      root.dataset.theme = isDark ? "light" : "dark";
+      renderTree();
+      refreshChart();
+    });
+
+    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+      if (!root.dataset.theme) {
+        renderTree();
+        refreshChart();
+      }
+    });
+
+    filterEl.addEventListener("input", () => {
+      state.filter = filterEl.value.trim().toLowerCase();
+      renderTree();
+    });
+
+    new ResizeObserver(() => {
+      if (!state.chart) return;
+      const rect = shellEl.getBoundingClientRect();
+      state.chart.setSize({ width: Math.max(300, Math.floor(rect.width)), height: Math.max(240, Math.floor(rect.height)) });
+    }).observe(shellEl);
+
+    setInterval(() => {
+      if (autoEl.checked) refreshChart();
+    }, 5000);
+    setInterval(refreshSeries, 10000);
+    refreshSeries();
+  </script>
+</body>
+</html>
