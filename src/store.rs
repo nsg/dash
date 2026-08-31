@@ -47,6 +47,7 @@ struct HeadChunk {
 struct SealedChunk {
     start_ts: i64,
     end_ts: i64,
+    last_value: f64,
     bytes: Vec<u8>,
     num_points: usize,
 }
@@ -182,33 +183,35 @@ impl Store {
         else {
             return Some(Vec::new());
         };
-        let mut sums = vec![0.0; bucket_count];
-        let mut counts = vec![0_u64; bucket_count];
-        let chunks = Self::snapshot_chunks(&series, from_ms, to_ms);
+        let mut values = vec![None; bucket_count];
+        let (mut last_value, chunks) = Self::snapshot_chunks(&series, from_ms, to_ms);
 
         for chunk in chunks {
             for (timestamp, value) in ChunkDecoder::new(&chunk.bytes, chunk.num_points) {
-                if timestamp < from_ms || timestamp >= to_ms {
+                if timestamp < from_ms {
+                    last_value = Some(value);
+                    continue;
+                }
+                if timestamp >= to_ms {
                     continue;
                 }
                 let index = usize::try_from((timestamp - from_ms) / step_ms)
                     .expect("bucket index must be non-negative");
-                sums[index] += value;
-                counts[index] += 1;
+                values[index] = Some(value);
             }
         }
 
         Some(
-            sums.into_iter()
-                .zip(counts)
+            values
+                .into_iter()
                 .enumerate()
-                .map(|(index, (sum, count))| {
+                .map(|(index, value)| {
                     let offset = i64::try_from(index)
                         .expect("bucket index must fit i64")
                         .saturating_mul(step_ms);
                     let timestamp = from_ms.saturating_add(offset);
-                    let value = (count != 0).then_some(sum / count as f64);
-                    (timestamp, value)
+                    last_value = value.or(last_value);
+                    (timestamp, last_value)
                 })
                 .collect(),
         )
@@ -276,6 +279,10 @@ impl Store {
                     .encoder
                     .last_ts()
                     .expect("non-empty chunk must have a last timestamp"),
+                last_value: old_head
+                    .encoder
+                    .last_value()
+                    .expect("non-empty chunk must have a last value"),
                 num_points: old_head.encoder.num_points(),
                 bytes: old_head.encoder.into_bytes(),
             });
@@ -289,10 +296,19 @@ impl Store {
         head.encoder.append(timestamp, value).is_ok()
     }
 
-    fn snapshot_chunks(series: &Series, from_ms: i64, to_ms: i64) -> Vec<ChunkSnapshot> {
+    fn snapshot_chunks(
+        series: &Series,
+        from_ms: i64,
+        to_ms: i64,
+    ) -> (Option<f64>, Vec<ChunkSnapshot>) {
         let head = series.head.lock().expect("series head lock poisoned");
         let sealed = series.sealed.read().expect("sealed chunks lock poisoned");
         let mut chunks = Vec::with_capacity(sealed.len() + 1);
+        let mut last_value = sealed
+            .iter()
+            .rev()
+            .find(|chunk| chunk.end_ts < from_ms)
+            .map(|chunk| chunk.last_value);
 
         chunks.extend(
             sealed
@@ -304,11 +320,15 @@ impl Store {
                 }),
         );
 
+        if head
+            .encoder
+            .last_ts()
+            .is_some_and(|timestamp| timestamp < from_ms)
+        {
+            last_value = head.encoder.last_value();
+        }
+
         if head.encoder.num_points() != 0
-            && head
-                .encoder
-                .last_ts()
-                .is_some_and(|timestamp| timestamp >= from_ms)
             && head
                 .encoder
                 .first_ts()
@@ -320,7 +340,7 @@ impl Store {
             });
         }
 
-        chunks
+        (last_value, chunks)
     }
 
     fn expire_and_is_empty(series: &Series, cutoff: i64) -> bool {
@@ -454,7 +474,7 @@ mod tests {
         assert_eq!(result.accepted, 2);
         assert_eq!(result.rejected, 0);
         let values: Vec<_> = store
-            .query("cpu", 90, 120, 5)
+            .query("cpu", 95, 110, 10)
             .unwrap()
             .into_iter()
             .filter_map(|(_, value)| value)
@@ -528,11 +548,11 @@ mod tests {
             .into_iter()
             .map(|(_, value)| value)
             .collect();
-        assert_eq!(values, vec![Some(1.0), None, Some(3.0)]);
+        assert_eq!(values, vec![Some(1.0), Some(1.0), Some(3.0)]);
     }
 
     #[test]
-    fn downsampling_averages_points_and_preserves_gaps() {
+    fn downsampling_keeps_the_last_value_and_carries_it_forward() {
         let store = Store::new(Duration::from_secs(10), Duration::from_secs(1));
         assert_eq!(
             store
@@ -549,8 +569,48 @@ mod tests {
         );
 
         assert_eq!(
-            store.query("load", 1_000, 1_500, 200).unwrap(),
-            vec![(1_000, Some(2.0)), (1_200, Some(5.0)), (1_400, None),]
+            store.query("load", 800, 1_500, 200).unwrap(),
+            vec![
+                (800, None),
+                (1_000, Some(3.0)),
+                (1_200, Some(5.0)),
+                (1_400, Some(5.0)),
+            ]
+        );
+
+        let head_only = Store::new(Duration::from_secs(10), Duration::from_secs(10));
+        assert_eq!(
+            head_only
+                .ingest_at(vec![point("load", 900, 11.0)], 900)
+                .accepted,
+            1
+        );
+        assert_eq!(
+            head_only.query("load", 1_000, 1_300, 100).unwrap(),
+            vec![
+                (1_000, Some(11.0)),
+                (1_100, Some(11.0)),
+                (1_200, Some(11.0)),
+            ]
+        );
+    }
+
+    #[test]
+    fn query_seeds_the_range_with_the_last_retained_value() {
+        let store = Store::new(Duration::from_secs(10), Duration::from_secs(1));
+        assert_eq!(
+            store
+                .ingest_at(
+                    vec![point("load", 900, 7.0), point("load", 1_300, 5.0)],
+                    1_300,
+                )
+                .accepted,
+            2
+        );
+
+        assert_eq!(
+            store.query("load", 1_000, 1_300, 100).unwrap(),
+            vec![(1_000, Some(7.0)), (1_100, Some(7.0)), (1_200, Some(7.0)),]
         );
     }
 

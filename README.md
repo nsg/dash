@@ -86,7 +86,9 @@ segment (`web.*.latency_ms` matches `web.backend.latency_ms`, not
 like `-15m`; `step` accepts `10s`-style durations or plain ms. Defaults:
 `from=-1h`, `to=now`, `step` auto-picked for ~300 buckets. Expansion is
 capped at 20 series (`"truncated":true` past that). All series share one
-time grid; empty buckets are `null`.
+time grid. Each bucket keeps its last sample, and empty buckets carry the
+newest retained value forward; buckets before the first known value are
+`null`.
 
 ```bash
 curl -s 'localhost:9090/query?m=web.*.latency_ms&from=-15m&step=10s'
