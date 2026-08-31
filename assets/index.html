@@ -19,6 +19,18 @@
       --series-6: #008300;
       --series-7: #4a3aa7;
       --series-8: #e34948;
+      --series-9: #008c95;
+      --series-10: #a85c00;
+      --series-11: #9b51b4;
+      --series-12: #006db5;
+      --series-13: #c03a78;
+      --series-14: #6b8e23;
+      --series-15: #b44f3b;
+      --series-16: #006f5f;
+      --series-17: #7357c0;
+      --series-18: #ad6f00;
+      --series-19: #007fbd;
+      --series-20: #a13d57;
       --status-good: #0ca30c;
       --chart-surface: #fcfcfb;
       --page-background: #f9f9f7;
@@ -45,6 +57,18 @@
         --series-6: #008300;
         --series-7: #9085e9;
         --series-8: #e66767;
+        --series-9: #25b7c0;
+        --series-10: #d38a38;
+        --series-11: #c481dc;
+        --series-12: #4c9ddd;
+        --series-13: #e16aa2;
+        --series-14: #9bbd54;
+        --series-15: #dc7a64;
+        --series-16: #35a895;
+        --series-17: #9b85dc;
+        --series-18: #d9a33e;
+        --series-19: #42a9d8;
+        --series-20: #d16a83;
         --chart-surface: #1a1a19;
         --page-background: #0d0d0d;
         --primary-text: #ffffff;
@@ -69,6 +93,18 @@
       --series-6: #008300;
       --series-7: #4a3aa7;
       --series-8: #e34948;
+      --series-9: #008c95;
+      --series-10: #a85c00;
+      --series-11: #9b51b4;
+      --series-12: #006db5;
+      --series-13: #c03a78;
+      --series-14: #6b8e23;
+      --series-15: #b44f3b;
+      --series-16: #006f5f;
+      --series-17: #7357c0;
+      --series-18: #ad6f00;
+      --series-19: #007fbd;
+      --series-20: #a13d57;
       --chart-surface: #fcfcfb;
       --page-background: #f9f9f7;
       --primary-text: #0b0b0b;
@@ -92,6 +128,18 @@
       --series-6: #008300;
       --series-7: #9085e9;
       --series-8: #e66767;
+      --series-9: #25b7c0;
+      --series-10: #d38a38;
+      --series-11: #c481dc;
+      --series-12: #4c9ddd;
+      --series-13: #e16aa2;
+      --series-14: #9bbd54;
+      --series-15: #dc7a64;
+      --series-16: #35a895;
+      --series-17: #9b85dc;
+      --series-18: #d9a33e;
+      --series-19: #42a9d8;
+      --series-20: #d16a83;
       --chart-surface: #1a1a19;
       --page-background: #0d0d0d;
       --primary-text: #ffffff;
@@ -623,6 +671,7 @@
     const emptyEl = document.querySelector("#empty");
     const liveBtn = document.querySelector("#live-toggle");
     const root = document.documentElement;
+    const MAX_SELECTED_SERIES = 20;
 
     function color(slot) {
       return getComputedStyle(root).getPropertyValue(`--series-${slot}`).trim();
@@ -630,7 +679,7 @@
 
     function firstFreeSlot() {
       const used = new Set(state.selected.values());
-      for (let slot = 1; slot <= 8; slot += 1) {
+      for (let slot = 1; slot <= MAX_SELECTED_SERIES; slot += 1) {
         if (!used.has(slot)) return slot;
       }
       return null;
@@ -772,7 +821,7 @@
 
     function renderTree() {
       listEl.replaceChildren();
-      const capped = state.selected.size >= 8;
+      const capped = state.selected.size >= MAX_SELECTED_SERIES;
       selectedCountEl.textContent = `${state.selected.size} selected`;
       menuCountEl.textContent = String(state.selected.size);
       menuCountEl.hidden = state.selected.size === 0;
@@ -781,7 +830,9 @@
           .sort((left, right) => left.segment.localeCompare(right.segment));
         for (const node of roots) renderNode(node, 0, capped);
       }
-      hintEl.textContent = capped && state.names.length > state.selected.size ? "max 8 series" : "";
+      hintEl.textContent = capped && state.names.length > state.selected.size
+        ? `max ${MAX_SELECTED_SERIES} series`
+        : "";
     }
 
     async function refreshSeries() {
