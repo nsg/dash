@@ -31,7 +31,7 @@ embedded at compile time.
 - Gorilla-compressed in-memory storage, sharded for concurrent ingest
 - Dot-hierarchy metric names with Graphite-style `/find` and `*` globs
 - Built-in live dashboard: collapsible series tree, filtering, time-range
-  presets, auto-refresh, light/dark theme
+  presets, auto-refresh, light/dark theme, shareable URLs, named bookmarks
 - Retention by chunk rotation — no compaction, no cleanup jobs, no disk
 - Single binary, four dependencies, no configuration required
 

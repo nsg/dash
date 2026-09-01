@@ -344,6 +344,41 @@
       text-transform: uppercase;
     }
 
+    .sidebar-title:not(:first-child) { margin-top: 20px; }
+
+    #bookmark-list { display: grid; gap: 1px; }
+    #bookmark-list:not(:empty) { margin-bottom: 6px; }
+
+    .bookmark-row svg { flex: 0 0 auto; color: var(--muted); }
+    .bookmark-row.active { color: var(--primary-text); }
+    .bookmark-row.active svg { color: var(--series-1); }
+
+    .bookmark-delete {
+      margin-left: auto;
+      border: 0;
+      border-radius: 4px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1;
+      padding: 4px 6px;
+      opacity: 0;
+    }
+
+    .bookmark-row:hover .bookmark-delete,
+    .bookmark-delete:focus-visible { opacity: 1; }
+
+    .bookmark-delete:hover { color: var(--primary-text); background: var(--hairline); }
+
+    #bookmark-add {
+      width: 100%;
+      color: var(--muted);
+      text-align: left;
+    }
+
+    #bookmark-add:disabled { cursor: default; opacity: 0.5; }
+    #bookmark-add:disabled:hover { color: var(--muted); border-color: var(--hairline); }
+
     .sidebar-tools {
       display: flex;
       align-items: center;
@@ -351,7 +386,7 @@
       margin: 0 2px 10px;
     }
 
-    #series-filter {
+    #series-filter, #bookmark-name {
       min-width: 0;
       width: 100%;
       border: 1px solid var(--hairline);
@@ -362,7 +397,7 @@
       padding: 8px 10px;
     }
 
-    #series-filter::placeholder { color: var(--muted); }
+    #series-filter::placeholder, #bookmark-name::placeholder { color: var(--muted); }
     #selected-count { color: var(--muted); font-size: 11px; white-space: nowrap; }
     #series-list { display: grid; gap: 1px; }
 
@@ -586,6 +621,7 @@
     }
 
     @media (pointer: coarse) {
+      .bookmark-delete { opacity: 1; }
       .tree-row { min-height: 44px; }
       button { min-height: 40px; }
       .icon-btn, #live-toggle { min-height: 40px; }
@@ -626,6 +662,10 @@
   </header>
   <div class="layout">
     <aside id="sidebar">
+      <h2 class="sidebar-title">Bookmarks</h2>
+      <div id="bookmark-list"></div>
+      <input id="bookmark-name" type="text" placeholder="Bookmark name…" aria-label="Bookmark name" hidden>
+      <button id="bookmark-add" type="button">＋ Bookmark current graphs</button>
       <h2 class="sidebar-title">Series</h2>
       <div class="sidebar-tools">
         <input id="series-filter" type="search" placeholder="Filter…" aria-label="Filter series">
@@ -657,8 +697,12 @@
       expanded: new Set(),
       filter: "",
       legendExtra: null,
+      bookmarks: [],
     };
 
+    const bookmarkListEl = document.querySelector("#bookmark-list");
+    const bookmarkAddBtn = document.querySelector("#bookmark-add");
+    const bookmarkNameEl = document.querySelector("#bookmark-name");
     const listEl = document.querySelector("#series-list");
     const hintEl = document.querySelector("#series-hint");
     const filterEl = document.querySelector("#series-filter");
@@ -688,16 +732,159 @@
       }
     }
 
+    function currentView() {
+      return {
+        series: [...state.selected.entries()]
+          .sort((left, right) => left[1] - right[1])
+          .map(([name]) => name),
+        range: state.rangeMinutes,
+      };
+    }
+
     function syncUrl() {
       const params = new URLSearchParams();
-      const names = [...state.selected.entries()]
-        .sort((left, right) => left[1] - right[1])
-        .map(([name]) => name);
-      for (const name of names) params.append("m", name);
+      for (const name of currentView().series) params.append("m", name);
       if (state.rangeMinutes !== 15) params.set("range", String(state.rangeMinutes));
       const query = params.toString();
       history.replaceState(null, "", query ? `?${query}` : location.pathname);
     }
+
+    function loadBookmarks() {
+      try {
+        const parsed = JSON.parse(localStorage.getItem("dash-bookmarks"));
+        if (!Array.isArray(parsed)) return [];
+        return parsed.filter(item => item
+          && typeof item.name === "string"
+          && Array.isArray(item.series)
+          && item.series.every(name => typeof name === "string"));
+      } catch (error) {
+        return [];
+      }
+    }
+
+    function persistBookmarks() {
+      try {
+        localStorage.setItem("dash-bookmarks", JSON.stringify(state.bookmarks));
+      } catch (error) {
+        // Private browsing or full storage: bookmarks stay session-only.
+      }
+    }
+
+    function rangeLabel(minutes) {
+      const button = document.querySelector(`.range[data-minutes="${minutes}"]`);
+      return button ? button.textContent : `${minutes}m`;
+    }
+
+    function viewMatchesBookmark(bookmark) {
+      const view = currentView();
+      return bookmark.range === view.range
+        && bookmark.series.length === view.series.length
+        && bookmark.series.every((name, index) => name === view.series[index]);
+    }
+
+    function applyBookmark(bookmark) {
+      state.selected = new Map(bookmark.series
+        .slice(0, MAX_SELECTED_SERIES)
+        .map((name, index) => [name, index + 1]));
+      state.didAutoSelect = true;
+      const rangeButton = document.querySelector(`.range[data-minutes="${bookmark.range}"]`);
+      if (rangeButton) {
+        state.rangeMinutes = bookmark.range;
+        document.querySelectorAll(".range").forEach(item => item.classList.toggle("active", item === rangeButton));
+      }
+      syncUrl();
+      renderTree();
+      refreshChart();
+      setDrawer(false);
+    }
+
+    function deleteBookmark(bookmark) {
+      state.bookmarks = state.bookmarks.filter(item => item !== bookmark);
+      persistBookmarks();
+      renderBookmarks();
+    }
+
+    function saveBookmark(name) {
+      const bookmark = { name, ...currentView() };
+      const existing = state.bookmarks.findIndex(item => item.name === name);
+      if (existing >= 0) state.bookmarks[existing] = bookmark;
+      else state.bookmarks.push(bookmark);
+      persistBookmarks();
+      renderBookmarks();
+    }
+
+    function renderBookmarks() {
+      bookmarkListEl.replaceChildren();
+      for (const bookmark of state.bookmarks) {
+        const row = document.createElement("div");
+        row.className = `tree-row bookmark-row${viewMatchesBookmark(bookmark) ? " active" : ""}`;
+        row.tabIndex = 0;
+        row.setAttribute("role", "button");
+        row.title = `${bookmark.series.join(", ")} · ${rangeLabel(bookmark.range)}`;
+
+        const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        icon.setAttribute("width", "10");
+        icon.setAttribute("height", "12");
+        icon.setAttribute("viewBox", "0 0 10 12");
+        icon.setAttribute("aria-hidden", "true");
+        icon.innerHTML = '<path d="M1.5 1h7a.5.5 0 0 1 .5.5V11L5 8.4 1 11V1.5a.5.5 0 0 1 .5-.5Z" fill="currentColor"/>';
+
+        const text = document.createElement("span");
+        text.className = "series-name";
+        text.textContent = bookmark.name;
+
+        const count = document.createElement("span");
+        count.className = "leaf-count";
+        count.textContent = String(bookmark.series.length);
+
+        const remove = document.createElement("button");
+        remove.className = "bookmark-delete";
+        remove.type = "button";
+        remove.textContent = "×";
+        remove.setAttribute("aria-label", `Delete bookmark ${bookmark.name}`);
+        remove.addEventListener("click", event => {
+          event.stopPropagation();
+          deleteBookmark(bookmark);
+        });
+
+        row.append(icon, text, count, remove);
+        row.addEventListener("click", () => applyBookmark(bookmark));
+        row.addEventListener("keydown", event => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            applyBookmark(bookmark);
+          }
+        });
+        bookmarkListEl.append(row);
+      }
+      bookmarkAddBtn.disabled = state.selected.size === 0;
+    }
+
+    function closeBookmarkInput() {
+      bookmarkNameEl.hidden = true;
+      bookmarkAddBtn.hidden = false;
+    }
+
+    bookmarkAddBtn.addEventListener("click", () => {
+      bookmarkAddBtn.hidden = true;
+      bookmarkNameEl.hidden = false;
+      bookmarkNameEl.value = "";
+      bookmarkNameEl.focus();
+    });
+
+    bookmarkNameEl.addEventListener("keydown", event => {
+      if (event.key === "Enter") {
+        const name = bookmarkNameEl.value.trim();
+        if (!name) return;
+        saveBookmark(name);
+        closeBookmarkInput();
+      } else if (event.key === "Escape") {
+        event.stopPropagation();
+        closeBookmarkInput();
+      }
+    });
+
+    bookmarkNameEl.addEventListener("blur", closeBookmarkInput);
 
     function color(slot) {
       return getComputedStyle(root).getPropertyValue(`--series-${slot}`).trim();
@@ -860,6 +1047,7 @@
       hintEl.textContent = capped && state.names.length > state.selected.size
         ? `max ${MAX_SELECTED_SERIES} series`
         : "";
+      renderBookmarks();
     }
 
     async function refreshSeries() {
@@ -1040,6 +1228,7 @@
         state.rangeMinutes = Number(button.dataset.minutes);
         document.querySelectorAll(".range").forEach(item => item.classList.toggle("active", item === button));
         syncUrl();
+        renderBookmarks();
         refreshChart();
       });
     });
@@ -1090,7 +1279,9 @@
       if (liveBtn.getAttribute("aria-pressed") === "true") refreshChart();
     }, 5000);
     setInterval(refreshSeries, 10000);
+    state.bookmarks = loadBookmarks();
     readStateFromUrl();
+    renderBookmarks();
     refreshSeries();
   </script>
 </body>
