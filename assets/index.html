@@ -673,6 +673,32 @@
     const root = document.documentElement;
     const MAX_SELECTED_SERIES = 20;
 
+    function readStateFromUrl() {
+      const params = new URLSearchParams(location.search);
+      const range = Number(params.get("range"));
+      const rangeButton = document.querySelector(`.range[data-minutes="${range}"]`);
+      if (rangeButton) {
+        state.rangeMinutes = range;
+        document.querySelectorAll(".range").forEach(item => item.classList.toggle("active", item === rangeButton));
+      }
+      const names = [...new Set(params.getAll("m").filter(Boolean))].slice(0, MAX_SELECTED_SERIES);
+      if (names.length > 0) {
+        names.forEach((name, index) => state.selected.set(name, index + 1));
+        state.didAutoSelect = true;
+      }
+    }
+
+    function syncUrl() {
+      const params = new URLSearchParams();
+      const names = [...state.selected.entries()]
+        .sort((left, right) => left[1] - right[1])
+        .map(([name]) => name);
+      for (const name of names) params.append("m", name);
+      if (state.rangeMinutes !== 15) params.set("range", String(state.rangeMinutes));
+      const query = params.toString();
+      history.replaceState(null, "", query ? `?${query}` : location.pathname);
+    }
+
     function color(slot) {
       return getComputedStyle(root).getPropertyValue(`--series-${slot}`).trim();
     }
@@ -751,6 +777,7 @@
         } else {
           state.selected.delete(node.path);
         }
+        syncUrl();
         renderTree();
         refreshChart();
       });
@@ -869,6 +896,7 @@
           selectionChanged = true;
         }
 
+        if (selectionChanged) syncUrl();
         renderTree();
         if (firstLoad || selectionChanged) refreshChart();
       } catch (error) {
@@ -1011,6 +1039,7 @@
       button.addEventListener("click", () => {
         state.rangeMinutes = Number(button.dataset.minutes);
         document.querySelectorAll(".range").forEach(item => item.classList.toggle("active", item === button));
+        syncUrl();
         refreshChart();
       });
     });
@@ -1061,6 +1090,7 @@
       if (liveBtn.getAttribute("aria-pressed") === "true") refreshChart();
     }, 5000);
     setInterval(refreshSeries, 10000);
+    readStateFromUrl();
     refreshSeries();
   </script>
 </body>
